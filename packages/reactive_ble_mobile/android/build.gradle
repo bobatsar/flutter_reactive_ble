@@ -32,8 +32,14 @@ rootProject.allprojects {
 }
 
 apply plugin: 'com.android.library'
+// Built-in Kotlin: AGP 9 compiles Kotlin itself and Flutter >= 3.44 applies the
+// Kotlin Gradle Plugin (KGP) to plugins that don't. Applying KGP on AGP 9 breaks
+// built-in Kotlin, so it is only applied for AGP 8 (apps on Flutter < 3.44).
+// https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
+if (com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')[0].toInteger() < 9) {
+    pluginManager.apply('org.jetbrains.kotlin.android')
+}
 apply plugin: 'com.google.protobuf'
-apply plugin: 'kotlin-android'
 apply plugin: "io.gitlab.arturbosch.detekt"
 apply plugin: "de.mannodermaus.android-junit5"
 
@@ -62,13 +68,25 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
+}
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8.toString()
+// Replaces the removed `kotlinOptions` block. The `kotlin` extension only exists
+// once Kotlin is applied: right away for AGP 8 and built-in Kotlin, later on
+// when the Flutter Gradle Plugin applies KGP (AGP 9, android.builtInKotlin=false).
+def configureKotlinJvmTarget = {
+    kotlin {
+        compilerOptions {
+            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+        }
     }
+}
+if (extensions.findByName('kotlin') != null) {
+    configureKotlinJvmTarget()
+} else {
+    plugins.withId('org.jetbrains.kotlin.android') { configureKotlinJvmTarget() }
 }
 
 detekt {
